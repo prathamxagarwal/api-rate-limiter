@@ -2,10 +2,17 @@ import express from "express";
 import redisClient from "./config/redis.js";
 import testRoute from "./routes/testRoute.js"
 import rateLimiter from "./middleware/rateLimiter.js";
+import authRoute from "./routes/authRoute.js";
+import slidingWindowRateLimiter from "./middleware/slidingWindowRateLimiter.js";
 
 const app = express();
 
-app.use(rateLimiter(60,5));
+//app.use(slidingWindowRateLimiter(60,5));
+app.use(
+  "/auth",
+  slidingWindowRateLimiter(60, 3),
+  authRoute
+);
 app.use("/test",testRoute);
 
 const startServer = async ()=>{
