@@ -1,31 +1,50 @@
 import express from "express";
+import dotenv from "dotenv";
+
 import redisClient from "./config/redis.js";
-import testRoute from "./routes/testRoute.js"
-import rateLimiter from "./middleware/rateLimiter.js";
+
 import authRoute from "./routes/authRoute.js";
-import slidingWindowRateLimiter from "./middleware/slidingWindowRateLimiter.js";
+import testRoute from "./routes/testRoute.js";
+
+import slidingWindowRateLimiter
+from "./middleware/slidingWindowRateLimiter.js";
+
+dotenv.config();
 
 const app = express();
 
-//app.use(slidingWindowRateLimiter(60,5));
-app.use(
-  "/auth",
-  slidingWindowRateLimiter(60, 3),
-  authRoute
-);
-app.use("/test",testRoute);
+app.use(express.json());
 
-const startServer = async ()=>{
-    try{
+app.use(
+    "/auth",
+    slidingWindowRateLimiter(60, 3),
+    authRoute
+);
+
+app.use(
+    "/test",
+    slidingWindowRateLimiter(60, 5),
+    testRoute
+);
+
+const PORT = process.env.PORT || 3000;
+
+const startServer = async () => {
+    try {
         await redisClient.connect();
 
-        app.listen(3000, () => {
-            console.log("Server running on port 3000");
+        app.listen(PORT, () => {
+            console.log(
+                `Server running on port ${PORT}`
+            );
         });
 
-    } catch(error){
-        console.error("Failed to start server",error);
+    } catch (error) {
+        console.error(
+            "Failed to start server",
+            error
+        );
     }
 };
 
-startServer(); 
+startServer();

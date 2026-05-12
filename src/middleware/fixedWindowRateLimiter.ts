@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import redisClient from "../config/redis.js";
 
-const slidingWindowRateLimiter = (
+const fixedWindowRateLimiter = (
     windowSizeInSeconds: number,
     maxRequests: number
 ) => {
@@ -13,26 +13,20 @@ const slidingWindowRateLimiter = (
         try {
             const ip = req.ip || "unknown-ip";
 
-            const redisKey =
-                `sliding_window:${req.baseUrl}:${ip}`;
-
-            const currentTime = Date.now();
-
-            const windowStart =
-                currentTime -
-                windowSizeInSeconds * 1000;
-
-            await redisClient.zRemRangeByScore(
-                redisKey,
-                0,
-                windowStart
-            );
+            const redisKey = `fixed_window:${req.baseUrl}:${ip}`;
 
             const requestCount =
-                await redisClient.zCard(redisKey);
+                await redisClient.incr(redisKey);
+
+            if (requestCount === 1) {
+                await redisClient.expire(
+                    redisKey,
+                    windowSizeInSeconds
+                );
+            }
 
             const remainingRequests = Math.max(
-                maxRequests - requestCount - 1,
+                maxRequests - requestCount,
                 0
             );
 
@@ -46,27 +40,23 @@ const slidingWindowRateLimiter = (
                 remainingRequests
             );
 
-            if (requestCount >= maxRequests) {
+            if (requestCount > maxRequests) {
+                const ttl =
+                    await redisClient.ttl(redisKey);
+
+                res.setHeader("Retry-After", ttl);
+
                 return res.status(429).json({
                     success: false,
                     message: "Too many requests",
+                    retryAfter: ttl,
                 });
             }
-
-            await redisClient.zAdd(redisKey, {
-                score: currentTime,
-                value: `${currentTime}-${Math.random()}`,
-            });
-
-            await redisClient.expire(
-                redisKey,
-                windowSizeInSeconds
-            );
 
             next();
         } catch (error) {
             console.error(
-                "Sliding window rate limiter error:",
+                "Fixed window rate limiter error:",
                 error
             );
 
@@ -78,4 +68,4 @@ const slidingWindowRateLimiter = (
     };
 };
 
-export default slidingWindowRateLimiter;
+export default fixedWindowRateLimiter;
