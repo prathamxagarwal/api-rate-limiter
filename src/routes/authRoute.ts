@@ -1,8 +1,8 @@
 import { Router } from "express";
 
-const router= Router();
+const router = Router();
 
-router.get("/login", (req,res)=>{
+router.get("/login", (req, res) => {
     res.json({
         message: "Login Successful",
     });

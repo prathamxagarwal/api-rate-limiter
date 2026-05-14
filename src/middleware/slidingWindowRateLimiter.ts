@@ -11,16 +11,11 @@ const slidingWindowRateLimiter = (
         next: NextFunction
     ) => {
         try {
-            const ip = req.ip || "unknown-ip";
-
-            const redisKey =
-                `sliding_window:${req.baseUrl}:${ip}`;
+            const redisKey = "sliding_window_global";
 
             const currentTime = Date.now();
-
             const windowStart =
-                currentTime -
-                windowSizeInSeconds * 1000;
+                currentTime - windowSizeInSeconds * 1000;
 
             await redisClient.zRemRangeByScore(
                 redisKey,
@@ -31,19 +26,10 @@ const slidingWindowRateLimiter = (
             const requestCount =
                 await redisClient.zCard(redisKey);
 
-            const remainingRequests = Math.max(
-                maxRequests - requestCount - 1,
-                0
-            );
-
-            res.setHeader(
-                "X-RateLimit-Limit",
-                maxRequests
-            );
-
+            res.setHeader("X-RateLimit-Limit", maxRequests);
             res.setHeader(
                 "X-RateLimit-Remaining",
-                remainingRequests
+                Math.max(maxRequests - requestCount, 0)
             );
 
             if (requestCount >= maxRequests) {
